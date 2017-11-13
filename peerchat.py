@@ -83,10 +83,10 @@ def handle_io():
         # Pop will *remove* the message from the FIFO queue, and return it.
         msg_from_server = network_input.pop()
         # Great- we got a message from the server.
-        print("Got message %s" % msg_from_server)
+        print("Got message %s" % msg_from_server[0])
 
         #parse the message into a dictionary
-        msg = parse_message(msg_from_server)
+        msg = parse_message(msg_from_server[0])
 
         #error messsage
         if msg["PNUM"] == "0" : 
@@ -108,6 +108,7 @@ def handle_io():
                 network_output.appendleft(format_message(int(msg["DST"]), int(msg["SRC"]), 4, 1, msg["MNUM"], "", "ACK"))
                 print "received message from " + msg["SRC"] + ": " + msg["MESG"]
 
+        #Getting registration
         elif msg["PNUM"] == "6" :
 
             if int(msg["PNUM"]) == messageNumberDict[msg["MNUM"]] + 1:
@@ -119,11 +120,19 @@ def handle_io():
 
                 print "***************************"
                 print "Recently Seen Peers:"
+
+                #if I am in the recently seen peers array, remove
+                if myID in recentlySeenPeers :
+                    recentlySeenPeers.remove(myID)
+
                 print ','.join(recentlySeenPeers)
 
                 listOfKnownAddressses = ((msg["MESG"].split("and"))[1]).split(",")
                 for s in listOfKnownAddressses :
                     knownAddressesDict[s[:3]] = [(s[4:]).split("@")[0], (s[4:]).split("@")[1]] 
+
+                #if I am in the known address dictionary, remove myself
+                knownAddressesDict.pop(myID, None)    
 
                 print "Known addresses:"
                 for key, value in knownAddressesDict.iteritems() :
@@ -187,7 +196,7 @@ def run_loop():
     watch_for_write = []
     watch_for_read = [sys.stdin, our_socket]
 
-     #step 1
+     #step 1 format_message(000, 999, 1, 1, messageNumber, "", "register")
     network_output.appendleft(format_message(000, 999, 1, 1, messageNumber, "", "register"))
 
     while True:
@@ -211,10 +220,11 @@ def run_loop():
                     else:
                         pass
                 if item == our_socket:
-                    data = our_socket.recv(1024).decode('utf-8')
-                    if len(data) > 0:
-                        print("Received from network: %s" % data)
-                        network_input.appendleft(str(data))
+                    data = our_socket.recvfrom(1024)
+
+                    if len(data[0]) > 0:
+                        print("Received from network: %s" % data[0])
+                        network_input.appendleft(data)
                     else:
                         our_socket.close()
                         return
@@ -231,13 +241,14 @@ def run_loop():
                         # Normally you want to check the return value of
                         # send() to make sure you were able to send all the
                         # bytes.  Our messages are so short, we don't bother
-                        # doing that here.
-                        our_socket.send(msg_to_send.encode('utf-8'))
+                        # doing that here."SRC:000;DST:999;PNUM:1;HCT:1;MNUM:100;VL:;MESG:register"
+                        our_socket.sendto(msg_to_send, ('steel.isi.edu', 63682))
 
                     except IndexError:
                         pass
-                    except Exception as e:
-                        print("Unhandled send exception: %s" % e)
+                   
+                    #except Exception as e:
+                     #   print("Unhandled send exception: %s" % e)
             
             for item in except_ready:
                 if item == our_socket:
@@ -248,7 +259,7 @@ def run_loop():
         except KeyboardInterrupt:
             our_socket.close()
             return
-        except Exception as e:
+        #except Exception as e:
             print("Unhandled exception 0: %s" % e)
             return
         handle_io()
@@ -256,8 +267,8 @@ def run_loop():
 def connect_to_server():
     global our_socket
     # steel.isi.edu:63682,
-    server_address = ('steel.isi.edu', 63682)
-    our_socket.connect(server_address)
+    #server_address = ('steel.isi.edu', 63682)
+    #our_socket.connect(server_address)
 
    
     return
