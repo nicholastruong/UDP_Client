@@ -44,6 +44,7 @@ def format_message(src, dst, pnum, hct, mnum, vl, mesg):
 #remember to check for malformed messages
 def parse_message(s):
     list = s.split(";")
+
     dict = {"SRC": (list[0]).split(":")[1], "DST":(list[1]).split(":")[1], "PNUM":(list[2]).split(":")[1],
             "HCT": (list[3]).split(":")[1], "MNUM": (list[4]).split(":")[1], "VL": (list[5]).split(":")[1],
             "MESG": (list[6]).split(":")[1]
@@ -103,10 +104,13 @@ def handle_io():
                 print "Succesfully Registered. My ID is: " + myID
 
         #receiving a message
-        elif msg["PNUM"] == "3" :
-            if int(msg["DST"]) == myID :
-                network_output.appendleft(format_message(int(msg["DST"]), int(msg["SRC"]), 4, 1, msg["MNUM"], "", "ACK"))
-                print "received message from " + msg["SRC"] + ": " + msg["MESG"]
+        #elif msg["PNUM"] == "3" :
+         #   print "received a message from somone"
+          #  print myID
+            #print msg["DST"]
+           # if int(msg["DST"]) == int(myID) :
+            #    network_output.appendleft(format_message(int(msg["DST"]), int(msg["SRC"]), 4, 1, int(msg["MNUM"]), "", "ACK"))
+             #   print "received message from " + msg["SRC"] + ": " + msg["MESG"]
 
         #Getting registration
         elif msg["PNUM"] == "6" :
@@ -180,7 +184,7 @@ def handle_io():
         #need to check for special characters in message and under 200 characters   
         if "msg" in input :
             input_message = input.split(" ") #msg DST Message
-            network_output.appendleft(format_message(int(myID), int(input_message[1]), 3, 1, messageNumber, "", input_message[2]))
+            network_output.appendleft(format_message(int(myID), int(input_message[1]), 3, 1, messageNumber, "", " ".join(input_message[2:])))
 
         return
     except IndexError:
@@ -222,9 +226,43 @@ def run_loop():
                 if item == our_socket:
                     data = our_socket.recvfrom(1024)
 
+                    
+
                     if len(data[0]) > 0:
                         print("Received from network: %s" % data[0])
-                        network_input.appendleft(data)
+
+                        msg = parse_message(data[0])
+
+                        #if receive a message, send ack
+                        if msg["PNUM"] == "3" :
+                            print "received a message from somone"
+                            print myID
+                            print msg["DST"]
+                            #If I am destination, send ack
+                            if int(msg["DST"]) == int(myID) :
+                                our_socket.sendto(format_message(int(msg["DST"]), int(msg["SRC"]), 4, 1, int(msg["MNUM"]), "", "ACK"), data[1])
+                                print "received message from " + msg["SRC"] + ": " + msg["MESG"]
+                                print "sending ack"
+                            #step 5 forwarding    
+                            else :
+                                print "forwarding"
+                                network_input.appendleft(data)
+
+                        #if receive a broadcast, send ack
+                        elif msg["PNUM"] == "7" :
+                            print "received a broadcast from somone"
+                            print myID
+                            print msg["DST"]
+                            #If I am destination, send ack
+                            if int(msg["DST"]) == int(myID) :
+                                our_socket.sendto(format_message(int(msg["DST"]), int(msg["SRC"]), 8, 1, int(msg["MNUM"]), "", "ACK"), data[1])
+                                print "SRC:" + msg["SRC"] + " broadcasted:" + msg["MESG"]
+                                print "sending ack"
+
+                        #add network messages to input
+                        else :
+                            print "hi" + data[0]
+                            network_input.appendleft(data)
                     else:
                         our_socket.close()
                         return
@@ -242,8 +280,22 @@ def run_loop():
                         # send() to make sure you were able to send all the
                         # bytes.  Our messages are so short, we don't bother
                         # doing that here."SRC:000;DST:999;PNUM:1;HCT:1;MNUM:100;VL:;MESG:register"
-                        our_socket.sendto(msg_to_send, ('steel.isi.edu', 63682))
 
+                        msg = parse_message(msg_to_send)
+                        #if sending to the server
+                        if msg["DST"] == "999" : 
+                            our_socket.sendto(msg_to_send, ('steel.isi.edu', 63682))
+
+                        elif 1 <= int(msg["DST"]) <= 998:
+                            if msg["DST"] in knownAddressesDict : 
+                                sendingPort = knownAddressesDict[msg["DST"]]
+                                print sendingPort
+                                our_socket.sendto(msg_to_send, (sendingPort[0], int(sendingPort[1])))
+
+                            else :
+                                print "not in dictionary"
+                        else :
+                            print "Invalid Destination"
                     except IndexError:
                         pass
                    
