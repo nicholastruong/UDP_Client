@@ -29,6 +29,7 @@ messageNumber = 100
 recentlySeenPeers = []
 knownAddressesDict = {}
 messageNumberDict = {} #maps messageNumber to pnum type
+pendingMessages = {}
 
 #Messages follow format: SRC:###;DST:###;PNUM:#;HCT:#;MNUM:###;VL:xxx;MESG:yyy
 def format_message(src, dst, pnum, hct, mnum, vl, mesg):
@@ -62,6 +63,7 @@ def handle_io():
     global myID, myPort
     global recentlySeenPeers
     global knownAddressesDict
+    global pendingMessages
 
     current_time = time.time()
 
@@ -182,9 +184,14 @@ def handle_io():
             network_output.appendleft(format_message(int(myID), 999, 5, 1, messageNumber, "", "get map"))
 
         #need to check for special characters in message and under 200 characters   
-        if "msg" in input :
-            input_message = input.split(" ") #msg DST Message
-            network_output.appendleft(format_message(int(myID), int(input_message[1]), 3, 1, messageNumber, "", " ".join(input_message[2:])))
+        input_message = input.split(" ")
+        if input_message[0] == "msg":
+            sending_message = format_message(int(myID), int(input_message[1]), 3, 1, messageNumber, "", " ".join(input_message[2:]))
+            network_output.appendleft(sending_message)
+
+            #if known address, record this message
+            if input_message[1] in knownAddressesDict :
+                pendingMessages[str(messageNumber)] = [sending_message, 4]
 
         return
     except IndexError:
@@ -197,6 +204,7 @@ def handle_io():
 
 def run_loop():
     global our_socket, local_input, network_input, network_output
+    global timer1
     watch_for_write = []
     watch_for_read = [sys.stdin, our_socket]
 
@@ -205,6 +213,31 @@ def run_loop():
 
     while True:
         try:
+
+            #sending acks
+            current_time = time.time()
+            #pendingMessages maps a messageNumber to tuple (message, and number Acks Left)
+            if (current_time - timer1 >= 1) and pendingMessages: 
+                for key, value in pendingMessages.items() :
+                    timer1 = time.time()
+                    #resend message
+                    #decrement messages left to send
+                    msg_to_send = value[0]
+                    msg = parse_message(msg_to_send)
+
+                    if value[1] == 0 :
+                        
+                        print "ERROR: Gave up sending to " + msg["DST"]
+                        del pendingMessages[key]
+
+                    else : 
+                        print "num acks left = " + str(value[1])
+                        print "resending message " + msg_to_send
+
+                        sendingPort = knownAddressesDict[msg["DST"]]
+                        value[1] -= 1
+                        our_socket.sendto(msg_to_send, (sendingPort[0], int(sendingPort[1])))
+
             # Use select to wait for input from either stdin (0) or our
             # socket (i.e.  network input).  Select returns when one of the
             # watched items has input, or has outgoing buffer space or has
@@ -256,6 +289,7 @@ def run_loop():
                             #If I am destination, send ack
                             if int(msg["DST"]) == int(myID) :
                                 our_socket.sendto(format_message(int(msg["DST"]), int(msg["SRC"]), 8, 1, int(msg["MNUM"]), "", "ACK"), data[1])
+                                print "*********************"
                                 print "SRC:" + msg["SRC"] + " broadcasted:" + msg["MESG"]
                                 print "sending ack"
 
@@ -299,8 +333,8 @@ def run_loop():
                     except IndexError:
                         pass
                    
-                    #except Exception as e:
-                     #   print("Unhandled send exception: %s" % e)
+                    except Exception as e:
+                       print("Unhandled send exception: %s" % e)
             
             for item in except_ready:
                 if item == our_socket:
