@@ -210,19 +210,25 @@ def handle_io():
 
                         our_socket.sendto(sending_message, (value[0], int(value[1])))
                         pendingMessages[messageNumber] = [sending_message, 4]
-                        messageNumber += 1
+                    
+                    messageNumber += 1
+
                 else : 
                     count = 3
-                    for key in knownAddressesDict.iteritems() :
-                        if count > 0 :
-                            for key, value in knownAddressesDict.iteritems() :
-                                sending_message = format_message(int(myID), int(input_message[1]), 3, 9, messageNumber, str(myID), " ".join(input_message[2:]))
-                                
-                                count -= 1
-                                
-                                our_socket.sendto(sending_message, (value[0], int(value[1])))
-                                pendingMessages[messageNumber] = [sending_message, 4]
-                                messageNumber += 1
+                    for key, value in knownAddressesDict.iteritems() :
+                        
+
+                        if count > 0 :  
+                            print "initiating forwarding to : " 
+                            print value
+                            sending_message = format_message(int(myID), int(input_message[1]), 3, 9, messageNumber, str(myID), " ".join(input_message[2:]))
+                            
+                            count -= 1
+                            
+                            our_socket.sendto(sending_message, (value[0], int(value[1])))
+                            pendingMessages[messageNumber] = [sending_message, 4]
+                        
+                    messageNumber += 1
 
 
         #step 4, serial broadcast
@@ -265,54 +271,54 @@ def run_loop():
             #sending acks
             current_time = time.time()
             #pendingMessages maps a messageNumber to tuple (message, and number Acks Left)
-            if ((current_time - timer1 >= 2) and (pendingMessages)) or ((current_time - timer2 >= 2) and pendingBroadcastMessage): 
-                if pendingMessages : 
-                    for key, value in pendingMessages.items() :
-                        timer1 = time.time()
-                        #resend message
-                        #decrement messages left to send
-                        msg_to_send = value[0]
-                        msg = parse_message(msg_to_send)
+            # if ((current_time - timer1 >= 2) and (pendingMessages)) or ((current_time - timer2 >= 2) and pendingBroadcastMessage): 
+            #     if pendingMessages : 
+            #         for key, value in pendingMessages.items() :
+            #             timer1 = time.time()
+            #             #resend message
+            #             #decrement messages left to send
+            #             msg_to_send = value[0]
+            #             msg = parse_message(msg_to_send)
 
-                        if value[1] == 0 :
+            #             if value[1] == 0 :
                             
-                            print "ERROR: Gave up sending to " + msg["DST"]
-                            del pendingMessages[key]
+            #                 print "ERROR: Gave up sending to " + msg["DST"]
+            #                 del pendingMessages[key]
 
-                        elif value[1] == -1 :
-                            del pendingMessages[key]
+            #             elif value[1] == -1 :
+            #                 del pendingMessages[key]
 
-                        else : 
-                            print "num acks left = " + str(value[1])
-                            print "resending message " + msg_to_send
+            #             else : 
+            #                 print "num acks left = " + str(value[1])
+            #                 print "resending message " + msg_to_send
 
-                            sendingPort = knownAddressesDict[msg["DST"]]
-                            value[1] -= 1
-                            our_socket.sendto(msg_to_send, (sendingPort[0], int(sendingPort[1])))
+            #                 sendingPort = knownAddressesDict[msg["DST"]]
+            #                 value[1] -= 1
+            #                 our_socket.sendto(msg_to_send, (sendingPort[0], int(sendingPort[1])))
 
-                if pendingBroadcastMessage : 
-                    for key, value in pendingBroadcastMessage.items() :
-                        timer2 = time.time()
-                        #resend message
-                        #decrement messages left to send
-                        msg_to_send = value[0]
-                        msg = parse_message(msg_to_send)
+            #     if pendingBroadcastMessage : 
+            #         for key, value in pendingBroadcastMessage.items() :
+            #             timer2 = time.time()
+            #             #resend message
+            #             #decrement messages left to send
+            #             msg_to_send = value[0]
+            #             msg = parse_message(msg_to_send)
 
-                        if value[1] == 0 :
+            #             if value[1] == 0 :
                             
-                            print "ERROR: Gave up sending to " + key
-                            del pendingBroadcastMessage[key]
+            #                 print "ERROR: Gave up sending to " + key
+            #                 del pendingBroadcastMessage[key]
 
-                        elif value[1] == -1 :
-                            del pendingBroadcastMessage[key]
+            #             elif value[1] == -1 :
+            #                 del pendingBroadcastMessage[key]
 
-                        else : 
-                            print "num acks left = " + str(value[1])
-                            print "resending message " + msg_to_send
+            #             else : 
+            #                 print "num acks left = " + str(value[1])
+            #                 print "resending message " + msg_to_send
 
-                            sendingPort = knownAddressesDict[str(key)]
-                            value[1] -= 1
-                            our_socket.sendto(msg_to_send, (sendingPort[0], int(sendingPort[1])))
+            #                 sendingPort = knownAddressesDict[str(key)]
+            #                 value[1] -= 1
+            #                 our_socket.sendto(msg_to_send, (sendingPort[0], int(sendingPort[1])))
 
             # Use select to wait for input from either stdin (0) or our
             # socket (i.e.  network input).  Select returns when one of the
@@ -353,6 +359,7 @@ def run_loop():
                                 messageNumber += 1
                                 print "Received message from " + msg["SRC"] + ": " + msg["MESG"]
                                 print "sending ack"
+
                             #step 5 forwarding    
                             else :
 
@@ -365,18 +372,27 @@ def run_loop():
                                         print "MESG: " + msg["MESG"]
 
                                     else : 
+
                                         dictSize = len(knownAddressesDict)
                                         if (dictSize <= 3) :
-                                            for key in knownAddressesDict.iteritems() :
-                                                our_socket.sendto(format_message(int(msg["SRC"]), int(msg["DST"]), int(msg["PNUM"]), int(msg["HCT"])-1, int(msg["MNUM"]), msg["VL"] + "," + str(myID), "ACK"), knownAddressesDict[key])
-                                                pendingMessages[msg["MNUM"]] = [value[1], 4]
+                                            for key, value in knownAddressesDict.iteritems() :
+                                                print "forwarding to " + key
+                                                print "sending port is "
+                                                print value
+
+                                               
+                                                our_socket.sendto(format_message(int(msg["SRC"]), int(msg["DST"]), int(msg["PNUM"]), int(msg["HCT"])-1, int(msg["MNUM"]), msg["VL"] + "," + str(myID), msg["MSG"]), (value[0], int(value[1])))
+                                                #pendingMessages[msg["MNUM"]] = [value[1], 4]
                                         else : 
                                             count = 3
-                                            for key in knownAddressesDict.iteritems() :
+                                            for key, value in knownAddressesDict.iteritems() :
                                                 if count > 0 :
-                                                    our_socket.sendto(format_message(int(msg["SRC"]), int(msg["DST"]), int(msg["PNUM"]), int(msg["HCT"])-1, int(msg["MNUM"]), msg["VL"] + "," + str(myID), "ACK"), knownAddressesDict[key])
+                                                    print "forwarding to " + key
+                                                    print "sending port is "
+                                                    print value
+                                                    our_socket.sendto(format_message(int(msg["SRC"]), int(msg["DST"]), int(msg["PNUM"]), int(msg["HCT"])-1, int(msg["MNUM"]), msg["VL"] + "," + str(myID), msg["MSG"]), (value[0], int(value[1])))
                                                     count -= 1
-                                                    pendingMessages[msg["MNUM"]] = [value[1], 4]
+                                                    #pendingMessages[msg["MNUM"]] = [value[1], 4]
                                 else :
                                     print "************"
                                     print "Dropped message from " + msg["SRC"] + " to " + msg["DST"] + " - hop count exceeded"
@@ -386,14 +402,18 @@ def run_loop():
 
                         #if receive an ack, remove the message from pendingMessages
                         elif msg["PNUM"] == "4" :
-                            print "received ack, will stop resending now"
-                            if msg["MNUM"] in pendingMessages :  
-                                print "mnum is " + msg["MNUM"]
-                                message = parse_message((pendingMessages[msg["MNUM"]])[0])
-                                print message["DST"]
-                                if int(msg["DST"]) == int(message["SRC"]) and int(msg["SRC"]) == int(message["DST"]) :
-                                    print "ugh"
-                                    del pendingMessages[msg["MNUM"]]
+
+                            if int(msg["PNUM"]) == messageNumberDict[msg["MNUM"]] + 1:
+
+                                print "received ack, will stop resending now"
+                                if msg["MNUM"] in pendingMessages :  
+                                    print "mnum is " + msg["MNUM"]
+                                    message = parse_message((pendingMessages[msg["MNUM"]])[0])
+                                    print message["DST"]
+                                    if int(msg["DST"]) == int(message["SRC"]) and int(msg["SRC"]) == int(message["DST"]) :
+                                        print "ugh"
+                                        del pendingMessages[msg["MNUM"]]
+
 
                         #if receive a broadcast, send ack
                         elif msg["PNUM"] == "7" :
@@ -408,13 +428,16 @@ def run_loop():
                                 print "SRC:" + msg["SRC"] + " broadcasted:" + msg["MESG"]
                                 print "sending ack"
 
-                        elif msg["PNUM"] == "8" :
-                            print "received ack, will stop resending now"
-                            if msg["SRC"] in pendingBroadcastMessage : 
-                                message = parse_message((pendingBroadcastMessage[key])[0])
-                                if int(msg["DST"]) == int(myID) and int(msg["SRC"]) == int(message["DST"]) and msg["MNUM"] == message["MNUM"]:
-                                    print "ugh"
-                                    del pendingMessages[msg["SRC"]] 
+                        #if receive an ack
+                        # elif msg["PNUM"] == "8" :
+
+                        #                 if int(msg["PNUM"]) == messageNumberDict[msg["MNUM"]] + 1:
+
+                        #     if msg["SRC"] in pendingBroadcastMessage : 
+                        #         message = parse_message((pendingBroadcastMessage[msg["SRC"]])[0])
+                        #         if int(msg["DST"]) == int(myID) and int(msg["SRC"]) == int(message["DST"]) and msg["MNUM"] == message["MNUM"]:
+                        #             print "ugh"
+                        #             del pendingMessages[(msg["SRC"])] 
 
                         #add network messages to input
                         else :
