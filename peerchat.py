@@ -30,8 +30,8 @@ messageNumber = 100
 recentlySeenPeers = []
 knownAddressesDict = {}
 messageNumberDict = {} #maps messageNumber to pnum type
-pendingMessages = {} #mnum to (message, timesleft)
-pendingBroadcastMessage = {} #dst to (message, timesleft)
+pendingMessages = {} #mnum to (message, timesleft, sendingport)
+pendingBroadcastMessage = {} #dst to (message, timesleft, sendingport)
 
 #Messages follow format: SRC:###;DST:###;PNUM:#;HCT:#;MNUM:###;VL:xxx;MESG:yyy
 def format_message(src, dst, pnum, hct, mnum, vl, mesg):
@@ -192,11 +192,20 @@ def handle_io():
         #need to check for special characters in message and under 200 characters   
         
         if input_message[0] == "msg":
-        
+            
+
+            string_message = " ".join(input_message[2:])
+
+            #place limitations on messages to send
+            string_message = string_message.translate(None, '\'\":;')
+            string_message = string_message[:200] #limit to 200 characters
+
             #if known address, record this message
             if input_message[1] in knownAddressesDict :
                 m = messageNumber #must use temp variable m because format_message increments messageNumber
-                sending_message = format_message(int(myID), int(input_message[1]), 3, 1, messageNumber, "", " ".join(input_message[2:]))
+
+
+                sending_message = format_message(int(myID), int(input_message[1]), 3, 1, messageNumber, "", string_message)
                 messageNumber += 1
                 network_output.appendleft(sending_message)
                 pendingMessages[str(m)] = [sending_message, 4]
@@ -206,7 +215,7 @@ def handle_io():
                 dictSize = len(knownAddressesDict)
                 if (dictSize <= 3) :
                     for key, value in knownAddressesDict.iteritems() :
-                        sending_message = format_message(int(myID), int(input_message[1]), 3, 9, messageNumber, str(myID), " ".join(input_message[2:]))
+                        sending_message = format_message(int(myID), int(input_message[1]), 3, 9, messageNumber, str(myID), string_message)
 
                         our_socket.sendto(sending_message, (value[0], int(value[1])))
                         pendingMessages[messageNumber] = [sending_message, 4]
@@ -221,7 +230,7 @@ def handle_io():
                         if count > 0 :  
                             print "initiating forwarding to : " 
                             print value
-                            sending_message = format_message(int(myID), int(input_message[1]), 3, 9, messageNumber, str(myID), " ".join(input_message[2:]))
+                            sending_message = format_message(int(myID), int(input_message[1]), 3, 9, messageNumber, str(myID), string_message)
                             
                             count -= 1
                             
@@ -234,8 +243,15 @@ def handle_io():
         #step 4, serial broadcast
         if input_message[0] == "all" :
             m = messageNumber #must use temp variable m because format_message increments messageNumber
+
+            string_message = " ".join(input_message[1:])
+
+            #place limitations on messages to send
+            string_message = string_message.translate(None, '\'\":;')
+            string_message = string_message[:200] #limit to 200 characters
+
             for key in knownAddressesDict : 
-                sending_message = format_message(int(myID), int(key), 7, 1, messageNumber, "", " ".join(input_message[1:]))
+                sending_message = format_message(int(myID), int(key), 7, 1, messageNumber, "", string_message)
                 network_output.appendleft(sending_message)
                 pendingBroadcastMessage[key] = [sending_message, 4]
 
@@ -397,7 +413,7 @@ def run_loop():
                                     print "************"
                                     print "Dropped message from " + msg["SRC"] + " to " + msg["DST"] + " - hop count exceeded"
                                     print "MESG: " + msg["MESG"]
-                                #network_input.appendleft(data)
+                                
 
 
                         #if receive an ack, remove the message from pendingMessages
@@ -411,7 +427,7 @@ def run_loop():
                                     message = parse_message((pendingMessages[msg["MNUM"]])[0])
                                     print message["DST"]
                                     if int(msg["DST"]) == int(message["SRC"]) and int(msg["SRC"]) == int(message["DST"]) :
-                                        print "ugh"
+                                        print "removing from pendingMessages"
                                         del pendingMessages[msg["MNUM"]]
 
 
