@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-
-"""
-EE450 Homework 2
-Nicholas Truong
-Fall 2017
-"""
-
-# You are not required to use any of the code in this stub,
-# however you may find it a helpful starting point.
 
 from collections import deque
 import time
